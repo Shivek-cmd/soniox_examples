@@ -21,6 +21,7 @@ from processors.tts import TTSProcessor
 from processors.vad import VADProcessor
 from session import Session
 from tools import (
+    RestaurantState,
     get_system_message,
     get_tools,
 )
@@ -60,6 +61,24 @@ STT_CONTEXT = {
 
 SONIOX_API_KEY_TTS = os.getenv("SONIOX_API_KEY_TTS") or SONIOX_API_KEY
 SONIOX_API_HOST_TTS = os.getenv("SONIOX_API_HOST_TTS") or "wss://tts-rt.soniox.com/tts-websocket"
+
+
+class DynamicTTSProcessor(TTSProcessor):
+    """TTS processor that reads language/voice from RestaurantState on each new stream.
+
+    This enables mid-call language switching: the select_language tool updates
+    RestaurantState, and the next TTS stream picks up the new language/voice.
+    """
+
+    def __init__(self, state: RestaurantState, **kwargs):
+        super().__init__(**kwargs)
+        self._state = state
+
+    async def _generate_tts_response(self, message):
+        if not self._active_stream_id:
+            self._language = self._state.tts_language
+            self._voice = self._state.tts_voice
+        await super()._generate_tts_response(message)
 
 
 class QueryParams(pydantic.BaseModel):
@@ -117,6 +136,9 @@ async def handle(websocket: ServerConnection):
         await send_error_and_close(websocket, "Invalid language")
         return
 
+    # Per-call state — shared between select_language tool and DynamicTTSProcessor
+    state = RestaurantState()
+
     processors: List[MessageProcessor] = [
         VADProcessor(
             sample_rate=params.audio_in_sample_rate,
@@ -134,18 +156,19 @@ async def handle(websocket: ServerConnection):
             api_key=OPENAI_API_KEY,
             model=OPENAI_MODEL,
             system_message=get_system_message(LANGUAGES_MAP[params.language]),
-            tools=get_tools(),
+            tools=get_tools(state),
             temperature=LLM_TEMPERATURE,
             max_tokens=LLM_MAX_TOKENS,
         ),
-        TTSProcessor(
+        DynamicTTSProcessor(
+            state=state,
             api_key=SONIOX_API_KEY_TTS,
             api_host=SONIOX_API_HOST_TTS,
             model=SONIOX_TTS_MODEL,
-            language=params.language,
+            language=state.tts_language,
             audio_format=params.audio_out_format,
             sample_rate=params.audio_out_sample_rate,
-            voice=params.voice,
+            voice=state.tts_voice,
         ),
     ]
 

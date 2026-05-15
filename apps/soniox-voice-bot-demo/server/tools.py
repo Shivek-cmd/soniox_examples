@@ -4,6 +4,21 @@ from openai.types.chat import ChatCompletionFunctionToolParam
 
 RESTAURANT_NAME = "Bizbull Restaurant"
 
+# Maps customer language choice → Soniox TTS language code and voice ID
+# Verify voice IDs against your Soniox console: https://console.soniox.com
+LANGUAGE_CONFIG = {
+    "english": {"tts_language": "en", "tts_voice": "Maya"},
+    "hindi":   {"tts_language": "hi", "tts_voice": "Maya"},
+    "punjabi": {"tts_language": "pa", "tts_voice": "Maya"},
+}
+
+
+class RestaurantState:
+    """Mutable per-call state shared between tools and DynamicTTSProcessor."""
+    def __init__(self):
+        self.tts_language = "en"
+        self.tts_voice = "Maya"
+
 MENU = {
     "appetizers": [
         {"name": "Samosa (2 pcs)", "price": 7},
@@ -80,8 +95,8 @@ VOICE RULES (very important):
 
 HOW TO HANDLE THE CALL:
 1. Greet warmly: "Hi! This is Sierra calling from Bizbull Restaurant. Would you like to continue in English, Hindi, or Punjabi?"
-2. The moment the customer replies — detect their language and switch to it permanently for the rest of the call.
-3. Ask dine-in, pickup, or delivery.
+2. The moment the customer replies with their language — call `select_language` IMMEDIATELY (before saying anything else). This switches the voice to match their language.
+3. Then greet them in their chosen language and ask dine-in, pickup, or delivery.
 4. Help them order — use get_menu only when they ask what's available or about a specific dish.
 5. Once they seem done ordering, say the total and confirm.
 6. Place the order with place_order.
@@ -97,14 +112,40 @@ UPSELLING (like a good waiter — subtle, natural, maximum once or twice per cal
 
 LANGUAGE:
 - Always open the call in English with the language selection question.
-- The moment the customer replies — match their language and stay in it for the entire call.
-- If Punjabi → speak Punjabi. Use "ji" to be respectful.
-- If Hindi → speak Hindi.
+- The moment the customer indicates their language → call `select_language` tool first, then respond in that language.
+- If Punjabi → speak Punjabi (Gurmukhi script). Use "ji" to be respectful.
+- If Hindi → speak Hindi (Devanagari script).
 - If English → speak English.
 - Never switch languages again once the customer has chosen.
 
 Today is {datetime.now().strftime("%A, %B %d, %Y")}. Restaurant hours: 11 AM to 10 PM daily.
 """
+
+
+# ─── Tool 0: Select Language ──────────────────────────────────────────────────
+
+select_language_tool_description = ChatCompletionFunctionToolParam(
+    type="function",
+    function={
+        "name": "select_language",
+        "description": (
+            "Switch the conversation and TTS voice to the customer's chosen language. "
+            "Call this immediately when the customer indicates their language preference — "
+            "before generating any spoken response in that language."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "language": {
+                    "type": "string",
+                    "enum": ["english", "hindi", "punjabi"],
+                    "description": "The language the customer wants to use.",
+                },
+            },
+            "required": ["language"],
+        },
+    },
+)
 
 
 # ─── Tool 1: Get Menu ─────────────────────────────────────────────────────────
@@ -277,8 +318,16 @@ async def place_order(
 
 # ─── Register Tools ────────────────────────────────────────────────────────────
 
-def get_tools():
+def get_tools(state: RestaurantState):
+    async def select_language(language: str) -> str:
+        print(f"Running Tool: select_language(language='{language}')")
+        config = LANGUAGE_CONFIG.get(language.lower(), LANGUAGE_CONFIG["english"])
+        state.tts_language = config["tts_language"]
+        state.tts_voice = config["tts_voice"]
+        return f"Language switched to {language}. Now respond in {language}."
+
     return [
+        (select_language_tool_description, select_language),
         (get_menu_tool_description, get_menu),
         (check_item_availability_tool_description, check_item_availability),
         (place_order_tool_description, place_order),
