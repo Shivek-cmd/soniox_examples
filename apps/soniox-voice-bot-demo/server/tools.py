@@ -8,8 +8,8 @@ RESTAURANT_NAME = "Bizbull Restaurant"
 # Verify voice IDs against your Soniox console: https://console.soniox.com
 LANGUAGE_CONFIG = {
     "english": {"tts_language": "en", "tts_voice": "Maya"},
-    "hindi":   {"tts_language": "hi", "tts_voice": "Maya"},
-    "punjabi": {"tts_language": "pa", "tts_voice": "Maya"},
+    "hindi":   {"tts_language": "hi", "tts_voice": "female_1"},
+    "punjabi": {"tts_language": "pa", "tts_voice": "female_1"},
 }
 
 
