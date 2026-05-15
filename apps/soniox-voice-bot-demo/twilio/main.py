@@ -6,6 +6,7 @@ import base64
 import json
 import os
 
+import audioop
 import websockets
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, WebSocket
@@ -50,7 +51,8 @@ async def handle_media_stream(websocket: WebSocket):
     await websocket.accept()
 
     # Tell the bot that the input will be in 16-bit PCM format.
-    voice_bot_url_with_params = f"{SONIOX_VOICE_BOT_WS_URL}?audio_in_format=mulaw&audio_in_sample_rate=8000&audio_in_num_channels=1&audio_out_format=pcm_mulaw&audio_out_sample_rate=8000&language={VOICE_BOT_LANGUAGE}&voice={VOICE_BOT_VOICE}"
+    # The output format is currently fixed to whatever TTS produces.
+    voice_bot_url_with_params = f"{SONIOX_VOICE_BOT_WS_URL}?audio_in_format=mulaw&audio_in_sample_rate=8000&audio_in_num_channels=1&language={VOICE_BOT_LANGUAGE}&voice={VOICE_BOT_VOICE}"
     async with websockets.connect(voice_bot_url_with_params) as voicebot_ws:
         # Connection specific state
         stream_sid = None
@@ -93,8 +95,19 @@ async def handle_media_stream(websocket: WebSocket):
                             # Only barge-in on final transcription, not every partial word
                             await handle_speech_started_event()
                     else:
-                        # TTS outputs pcm_mulaw at 8kHz — forward directly to Twilio
-                        audio_payload = base64.b64encode(message).decode("utf-8")
+                        # pcm_audio_bytes from OpenAI TTS: 24kHz, 16-bit signed, little-endian, mono
+                        pcm_audio_bytes = message
+
+                        # Resample to 8kHz
+                        pcm_audio_bytes_8k = audioop.ratecv(
+                            pcm_audio_bytes, 2, 1, 24000, 8000, None
+                        )[0]
+                        # Convert to 8-bit µ-law
+                        ulaw_audio_bytes = audioop.lin2ulaw(pcm_audio_bytes_8k, 2)
+
+                        audio_payload = base64.b64encode(ulaw_audio_bytes).decode(
+                            "utf-8"
+                        )
                         audio_delta = {
                             "event": "media",
                             "streamSid": stream_sid,
