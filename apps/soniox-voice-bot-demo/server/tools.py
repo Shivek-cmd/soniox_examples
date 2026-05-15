@@ -4,20 +4,20 @@ from openai.types.chat import ChatCompletionFunctionToolParam
 
 RESTAURANT_NAME = "Bizbull Restaurant"
 
-# Maps customer language choice → Soniox TTS language code and voice ID
-# Verify voice IDs against your Soniox console: https://console.soniox.com
-LANGUAGE_CONFIG = {
-    "english": {"tts_language": "en", "tts_voice": "Maya"},
-    "hindi":   {"tts_language": "hi", "tts_voice": "female_1"},
-    "punjabi": {"tts_language": "pa", "tts_voice": "female_1"},
-}
-
-
-class RestaurantState:
-    """Mutable per-call state shared between tools and DynamicTTSProcessor."""
-    def __init__(self):
-        self.tts_language = "en"
-        self.tts_voice = "Maya"
+# ─── Language switching (disabled for now) ────────────────────────────────────
+# Uncomment and wire up DynamicTTSProcessor in main.py when ready to enable.
+#
+# LANGUAGE_CONFIG = {
+#     "english": {"tts_language": "en", "tts_voice": "Maya"},
+#     "hindi":   {"tts_language": "hi", "tts_voice": "Maya"},
+#     "punjabi": {"tts_language": "pa", "tts_voice": "Maya"},
+# }
+#
+# class RestaurantState:
+#     """Mutable per-call state shared between tools and DynamicTTSProcessor."""
+#     def __init__(self):
+#         self.tts_language = "en"
+#         self.tts_voice = "Maya"
 
 MENU = {
     "appetizers": [
@@ -112,7 +112,7 @@ UPSELLING (like a good waiter — subtle, natural, maximum once or twice per cal
 
 LANGUAGE:
 - Always open the call in English with the language selection question.
-- The moment the customer indicates their language → call `select_language` tool first, then respond in that language.
+- The moment the customer replies — match their language and stay in it for the entire call.
 - If Punjabi → speak Punjabi (Gurmukhi script). Use "ji" to be respectful.
 - If Hindi → speak Hindi (Devanagari script).
 - If English → speak English.
@@ -122,30 +122,30 @@ Today is {datetime.now().strftime("%A, %B %d, %Y")}. Restaurant hours: 11 AM to 
 """
 
 
-# ─── Tool 0: Select Language ──────────────────────────────────────────────────
-
-select_language_tool_description = ChatCompletionFunctionToolParam(
-    type="function",
-    function={
-        "name": "select_language",
-        "description": (
-            "Switch the conversation and TTS voice to the customer's chosen language. "
-            "Call this immediately when the customer indicates their language preference — "
-            "before generating any spoken response in that language."
-        ),
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "language": {
-                    "type": "string",
-                    "enum": ["english", "hindi", "punjabi"],
-                    "description": "The language the customer wants to use.",
-                },
-            },
-            "required": ["language"],
-        },
-    },
-)
+# ─── Tool 0: Select Language (disabled — re-enable with DynamicTTSProcessor) ──
+#
+# select_language_tool_description = ChatCompletionFunctionToolParam(
+#     type="function",
+#     function={
+#         "name": "select_language",
+#         "description": (
+#             "Switch the conversation and TTS voice to the customer's chosen language. "
+#             "Call this immediately when the customer indicates their language preference — "
+#             "before generating any spoken response in that language."
+#         ),
+#         "parameters": {
+#             "type": "object",
+#             "properties": {
+#                 "language": {
+#                     "type": "string",
+#                     "enum": ["english", "hindi", "punjabi"],
+#                     "description": "The language the customer wants to use.",
+#                 },
+#             },
+#             "required": ["language"],
+#         },
+#     },
+# )
 
 
 # ─── Tool 1: Get Menu ─────────────────────────────────────────────────────────
@@ -318,17 +318,25 @@ async def place_order(
 
 # ─── Register Tools ────────────────────────────────────────────────────────────
 
-def get_tools(state: RestaurantState):
-    async def select_language(language: str) -> str:
-        print(f"Running Tool: select_language(language='{language}')")
-        config = LANGUAGE_CONFIG.get(language.lower(), LANGUAGE_CONFIG["english"])
-        state.tts_language = config["tts_language"]
-        state.tts_voice = config["tts_voice"]
-        return f"Language switched to {language}. Now respond in {language}."
-
+def get_tools():
     return [
-        (select_language_tool_description, select_language),
         (get_menu_tool_description, get_menu),
         (check_item_availability_tool_description, check_item_availability),
         (place_order_tool_description, place_order),
     ]
+
+# ─── Language switching (disabled — uncomment when re-enabling) ───────────────
+# def get_tools(state: RestaurantState):
+#     async def select_language(language: str) -> str:
+#         print(f"Running Tool: select_language(language='{language}')")
+#         config = LANGUAGE_CONFIG.get(language.lower(), LANGUAGE_CONFIG["english"])
+#         state.tts_language = config["tts_language"]
+#         state.tts_voice = config["tts_voice"]
+#         return f"Language switched to {language}. Now respond in {language}."
+#
+#     return [
+#         (select_language_tool_description, select_language),
+#         (get_menu_tool_description, get_menu),
+#         (check_item_availability_tool_description, check_item_availability),
+#         (place_order_tool_description, place_order),
+#     ]
