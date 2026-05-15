@@ -91,8 +91,8 @@ async def handle_media_stream(websocket: WebSocket):
                     if isinstance(message, str):
                         print(f"Received event: {message}")
                         message = json.loads(message)
-                        if message["type"] == "transcription":
-                            # Got transcription, bot should stop speaking (if speaking)
+                        if message["type"] == "transcription" and message.get("final_text"):
+                            # Only barge-in on final transcription, not every partial word
                             await handle_speech_started_event()
                     else:
                         # pcm_audio_bytes from OpenAI TTS: 24kHz, 16-bit signed, little-endian, mono

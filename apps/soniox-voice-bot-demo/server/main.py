@@ -126,7 +126,7 @@ async def handle(websocket: ServerConnection):
             audio_format=params.audio_in_format,
             audio_sample_rate=params.audio_in_sample_rate,
             num_channels=params.audio_in_num_channels,
-            language_hints=[params.language],
+            language_hints=["pa", "hi", "en"],
             context=STT_CONTEXT,
         ),
         LLMProcessor(
