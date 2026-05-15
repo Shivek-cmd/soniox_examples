@@ -21,6 +21,7 @@ from processors.tts import TTSProcessor
 from processors.vad import VADProcessor
 from session import Session
 from tools import (
+    get_greeting,
     get_system_message,
     get_tools,
 )
@@ -136,6 +137,7 @@ async def handle(websocket: ServerConnection):
             tools=get_tools(),
             temperature=LLM_TEMPERATURE,
             max_tokens=LLM_MAX_TOKENS,
+            greeting=get_greeting(),
         ),
         TTSProcessor(
             api_key=SONIOX_API_KEY_TTS,

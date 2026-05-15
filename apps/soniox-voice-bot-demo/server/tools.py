@@ -4,6 +4,12 @@ from openai.types.chat import ChatCompletionFunctionToolParam
 
 RESTAURANT_NAME = "Bizbull Restaurant"
 
+GREETING = "Hi! This is Sierra calling from Bizbull Restaurant. Would you like to continue in English, Hindi, or Punjabi?"
+
+
+def get_greeting() -> str:
+    return GREETING
+
 MENU = {
     "appetizers": [
         {"name": "Samosa (2 pcs)", "price": 7},
