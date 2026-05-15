@@ -66,7 +66,6 @@ class LLMProcessor(MessageProcessor):
         ] = [],
         temperature: float = 0.85,
         max_tokens: int = 120,
-        greeting: str | None = None,
     ):
         """Initialize the LLM processor.
 
@@ -91,7 +90,6 @@ class LLMProcessor(MessageProcessor):
             if tool[0]["type"] == "function":
                 self._tool_functions[tool[0]["function"]["name"]] = tool[1]
 
-        self._greeting = greeting
         self._active_task: asyncio.Task | None = None
         self._messages: list[ChatCompletionMessageParam] = [
             ChatCompletionSystemMessageParam(
@@ -113,10 +111,9 @@ class LLMProcessor(MessageProcessor):
         elif isinstance(message, SessionStartMessage):
             self.log.debug("Session start message")
 
-            if self._greeting:
-                self._active_task = asyncio.create_task(self._send_hardcoded_greeting())
-            else:
-                self._active_task = asyncio.create_task(self._generate_llm_response())
+            # Start LLM generation as a background task
+            # If you want user to start the conversation, simply remove this condition
+            self._active_task = asyncio.create_task(self._generate_llm_response())
 
         elif isinstance(message, TranscriptionEndpointMessage):
             self.log.debug("Transcription endpoint message")
@@ -183,17 +180,6 @@ class LLMProcessor(MessageProcessor):
                     content=message.text().lstrip(),
                 )
             )
-
-    async def _send_hardcoded_greeting(self):
-        try:
-            chunk = LLMChunkMessage(self._greeting)
-            await self._send_message(chunk)
-            self._append_llm_message(chunk)
-            await self._send_message(LLMFullMessage(self._greeting))
-        except asyncio.CancelledError:
-            pass
-        finally:
-            self._active_task = None
 
     async def _generate_llm_response(self):
         # If there was no new user text, cancel the task
