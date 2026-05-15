@@ -24,6 +24,7 @@ class STTProcessor(MessageProcessor):
         self,
         api_key: str,
         api_host: str = "wss://stt-rt.soniox.com/transcribe-websocket",
+        model: str = "stt-rt-preview",
         audio_format: str = "pcm_s16le",
         audio_sample_rate: int | None = 16000,
         num_channels: int | None = 1,
@@ -51,6 +52,7 @@ class STTProcessor(MessageProcessor):
         """
         self._api_key = api_key
         self._api_host = api_host
+        self._model = model
 
         self._audio_format = audio_format
         self._sample_rate = audio_sample_rate
@@ -85,7 +87,7 @@ class STTProcessor(MessageProcessor):
         # Send the initial configuration message
         config = {
             "api_key": self._api_key,
-            "model": "stt-rt-preview",
+            "model": self._model,
             "enable_endpoint_detection": True,
             "enable_non_final_tokens": True,
             "language_hints": self._language_hints,

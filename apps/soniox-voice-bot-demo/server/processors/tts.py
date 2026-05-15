@@ -19,7 +19,7 @@ from messages import (
 from processors.message_processor import MessageProcessor
 
 DEFAULT_MODEL = "tts-rt-v1"
-DEFAULT_VOICE = "Alina"
+DEFAULT_VOICE = "Maya"
 DEFAULT_LANGUAGE = "en"
 DEFAULT_AUDIO_FORMAT = "pcm_s16le"
 DEFAULT_SAMPLE_RATE = 24000

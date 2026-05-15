@@ -2,267 +2,270 @@ from datetime import datetime
 
 from openai.types.chat import ChatCompletionFunctionToolParam
 
-"""
-This file defines the tools and persona for an AI voice assistant.
-To adapt this for your own business, you'll need to make changes in two key areas:
+RESTAURANT_NAME = "Bizbull Restaurant"
 
-1. Customize the AI Persona:
-   - Go to the `get_system_message()` function below.
-   - Edit the text within the f-string to change the assistant's information (e.g.
-     company name), its personality and its core instructions.
-   - You can also update the tool descriptions within the prompt to better match
-     your specific services.
+MENU = {
+    "appetizers": [
+        {"name": "Samosa (2 pcs)", "price": 7},
+        {"name": "Veg Pakora", "price": 10},
+        {"name": "Aloo Tikki (2 pcs)", "price": 9},
+        {"name": "Tandoori Chicken Half", "price": 18},
+        {"name": "Chicken Tikka", "price": 17},
+    ],
+    "mains": [
+        {"name": "Butter Chicken", "price": 18},
+        {"name": "Chicken Tikka Masala", "price": 18},
+        {"name": "Saag Chicken", "price": 18},
+        {"name": "Lamb Curry", "price": 20},
+        {"name": "Goat Curry", "price": 20},
+        {"name": "Dal Makhani", "price": 16},
+        {"name": "Palak Paneer", "price": 17},
+        {"name": "Kadai Paneer", "price": 17},
+        {"name": "Chana Masala", "price": 15},
+        {"name": "Aloo Gobi", "price": 15},
+        {"name": "Mix Vegetable", "price": 15},
+    ],
+    "bread": [
+        {"name": "Butter Naan", "price": 4},
+        {"name": "Garlic Naan", "price": 5},
+        {"name": "Roti", "price": 3},
+        {"name": "Paratha", "price": 5},
+        {"name": "Peshwari Naan", "price": 5},
+    ],
+    "rice": [
+        {"name": "Basmati Rice", "price": 4},
+        {"name": "Chicken Biryani", "price": 18},
+        {"name": "Veg Biryani", "price": 16},
+    ],
+    "drinks": [
+        {"name": "Mango Lassi", "price": 6},
+        {"name": "Sweet Lassi", "price": 5},
+        {"name": "Salted Lassi", "price": 5},
+        {"name": "Masala Chai", "price": 4},
+    ],
+    "desserts": [
+        {"name": "Gulab Jamun (2 pcs)", "price": 6},
+        {"name": "Kheer", "price": 6},
+        {"name": "Rasmalai (2 pcs)", "price": 7},
+    ],
+}
 
-2. Implement Real Tool Functions:
-   - The async functions `search_knowledge_base`, `check_availability`, and
-     `create_appointment` are currently mock implementations. They return fake data
-     for demonstration purposes.
-   - You must replace these functions or the mock logic inside these functions with
-     your own backend integrations.
-
-By making these changes, you can tailor this assistant to your specific business needs.
+BUSINESS_INFO = """
+Restaurant Name: Bizbull Restaurant
+Cuisine: Punjabi Indian
+Location: Canada
+Hours: Monday to Sunday, 11 AM to 10 PM
+Phone: (Ask owner to fill in)
+Accepts: Cash and all major credit cards
+Delivery: Available via DoorDash and Uber Eats
+Minimum order for delivery: $30
+All prices are in Canadian dollars (CAD).
 """
 
 
 def get_system_message(language: str) -> str:
     return f"""
-You are a friendly, conversational AI voice assistant for 'Soniox AutoWorks'. \
-Your primary goal is to help customers book car services and answer their questions.
+You are a real person named Priya working at {RESTAURANT_NAME}, a Punjabi Indian restaurant in Canada.
+You answer the phone and take food orders. You are warm, helpful, and natural — not robotic.
 
-Because this is a voice-to-voice conversation, you MUST keep your responses short, concise, and conversational. \
-Avoid long paragraphs, lists, emojis, special characters, or complex sentences. Get straight to the point in a friendly tone.
+VOICE RULES (very important):
+- Keep every response to 1-2 short sentences maximum. Never say more than needed.
+- Never use bullet points, lists, or emojis — this is a phone call.
+- Use natural filler phrases like "Sure!", "Of course!", "Great choice!" to sound human.
+- If you didn't understand something, say "Sorry, could you say that again?" — not "I didn't catch that."
+- Never repeat the customer's full order back word for word until final confirmation.
+- Speak conversationally — short, warm, natural.
 
-Your role is to help users with appointments and answer questions about the shop. Use your tools to perform actions.
+HOW TO HANDLE THE CALL:
+1. Greet warmly and ask dine-in, pickup, or delivery.
+2. Help them order — use get_menu only when they ask what's available or about a specific dish.
+3. Once they seem done ordering, say the total and confirm.
+4. Place the order with place_order.
+5. Tell them the wait time and say goodbye warmly.
 
-- To find answers to questions about business hours, services, location or policies, use the `search_knowledge_base` tool.
-- To check for open appointment times for a specific service, use the `check_availability` tool.
-- To book a new service appointment, use the `create_appointment` tool.
+LANGUAGE:
+- If customer speaks Punjabi, reply in Punjabi. Use "ji" to be respectful.
+- If English, reply in English.
+- Match the customer's language mid-conversation if they switch.
+- Selected language: {language}
 
-Start the conversation by greeting the user. User selected the following language for the conversation: {language}
-
-
-Current date: {datetime.now().isoformat()}
+Today is {datetime.now().strftime("%A, %B %d, %Y")}. Restaurant hours: 11 AM to 10 PM daily.
 """
 
 
-search_knowledge_base_tool_description = ChatCompletionFunctionToolParam(
+# ─── Tool 1: Get Menu ─────────────────────────────────────────────────────────
+
+get_menu_tool_description = ChatCompletionFunctionToolParam(
     type="function",
     function={
-        "name": "search_knowledge_base",
+        "name": "get_menu",
         "description": (
-            "Searches the shop's knowledge base for information on services, "
-            "business hours, location, and policies. Query the database in English, "
-            "but respond in the user's language."
+            "Returns the full menu or a specific category. "
+            "Use this when a customer asks what's available, asks about a dish, "
+            "or wants to know prices."
         ),
         "parameters": {
             "type": "object",
             "properties": {
-                "query": {
+                "category": {
                     "type": "string",
-                    "description": (
-                        "The user's question, e.g., 'What are your business hours?' "
-                        "or 'Do you offer synthetic oil changes?'"
-                    ),
+                    "description": "Menu category to fetch. Use 'all' for the full menu.",
+                    "enum": ["all", "appetizers", "mains", "bread", "rice", "drinks", "desserts"],
                 },
             },
-            "required": ["query"],
+            "required": ["category"],
         },
     },
 )
 
 
-async def search_knowledge_base(query: str) -> dict:
-    """
-    Simulates searching an internal database.
-    In a real application this would search for an answer, given the query from the
-    user in your knowledge base.
-    """
+async def get_menu(category: str) -> dict:
+    print(f"Running Tool: get_menu(category='{category}')")
 
-    print(f"Running Tool: search_knowledge_base(query='{query}')")
+    if category == "all":
+        return {"menu": MENU, "info": BUSINESS_INFO}
 
-    # Fictional knowledge base for the car mechanic shop
-    mock_response = """
-Soniox AutoWorks is located at 456 Gearshift Avenue.
-We are open from 8 AM to 6 PM, Monday through Friday, and 9 AM to 2 PM on Saturdays. We are closed on Sundays.
-We offer a range of services including:
-- Standard, Synthetic-Blend, and Full-Synthetic Oil Changes. A standard oil change starts at $49.99.
-- Tire Rotation and Balancing.
-- Brake Inspection and Replacement.
-- Engine Diagnostics and Repair.
-We specialize in all major domestic and import brands.
-    """
+    if category in MENU:
+        return {"category": category, "items": MENU[category]}
 
-    return {
-        "info": mock_response,
-    }
+    return {"error": "Category not found"}
 
 
-check_availability_tool_description = ChatCompletionFunctionToolParam(
+# ─── Tool 2: Check Item Availability ──────────────────────────────────────────
+
+check_item_availability_tool_description = ChatCompletionFunctionToolParam(
     type="function",
     function={
-        "name": "check_availability",
-        "description": "Checks available appointment slots for a specific service on a given day.",
+        "name": "check_item_availability",
+        "description": "Check if a specific menu item is available today.",
         "parameters": {
             "type": "object",
             "properties": {
-                "service_type": {
+                "item_name": {
                     "type": "string",
-                    "description": "The type of service the user wants to book.",
-                    "enum": [
-                        "oil_change",
-                        "tire_rotation",
-                        "brake_inspection",
-                        "diagnostic",
-                        "other",
-                    ],
-                },
-                "date": {
-                    "type": "string",
-                    "description": "The date to check for availability, in YYYY-MM-DD format.",
+                    "description": "The name of the menu item to check.",
                 },
             },
-            "required": ["service_type", "date"],
-            "additionalProperties": False,
+            "required": ["item_name"],
         },
     },
 )
 
 
-async def check_availability(service_type: str, date: str) -> dict:
-    """
-    Simulates checking a calendar for open appointment slots for a specific service.
-    """
-    print(
-        f"Running Tool: check_availability(service_type='{service_type}', date='{date}')"
-    )
+async def check_item_availability(item_name: str) -> dict:
+    print(f"Running Tool: check_item_availability(item_name='{item_name}')")
 
-    try:
-        # For this demo, we'll generate some plausible random slots.
-        # A real implementation would query a scheduling database.
-        requested_date = datetime.strptime(date, "%Y-%m-%d").date()
-        if requested_date < datetime.now().date():
-            return {"error": "Sorry, I can't check for availability on a past date."}
+    # Check across all categories
+    item_name_lower = item_name.lower()
+    for category, items in MENU.items():
+        for item in items:
+            if item_name_lower in item["name"].lower():
+                return {
+                    "available": True,
+                    "item": item["name"],
+                    "price": item["price"],
+                    "category": category,
+                }
 
-        # Different services have different slot availability
-        if service_type == "oil_change":
-            slots = ["09:00", "09:30", "10:00", "10:30", "14:30", "15:00"]
-        elif service_type == "tire_rotation":
-            slots = ["09:00", "11:00", "14:00", "16:00"]
-        else:
-            slots = ["10:00", "13:00"]
-
-        return {
-            "date": date,
-            "service_type": service_type,
-            "available_slots": slots,
-        }
-
-    except ValueError:
-        return {"error": "Invalid date format. Please use YYYY-MM-DD."}
+    return {"available": False, "message": f"Sorry, {item_name} is not on our menu."}
 
 
-create_appointment_tool_description = ChatCompletionFunctionToolParam(
+# ─── Tool 3: Place Order ───────────────────────────────────────────────────────
+
+place_order_tool_description = ChatCompletionFunctionToolParam(
     type="function",
     function={
-        "name": "create_appointment",
-        "description": "Books a new service appointment for a user with their vehicle details.",
+        "name": "place_order",
+        "description": "Place the final order after the customer has confirmed all items and the total.",
         "parameters": {
             "type": "object",
             "properties": {
-                "full_name": {
+                "customer_name": {
                     "type": "string",
-                    "description": "The full name of the person booking the appointment.",
+                    "description": "Full name of the customer.",
                 },
                 "phone_number": {
                     "type": "string",
-                    "description": "The phone number of the person for confirmation texts.",
+                    "description": "Customer's phone number for order confirmation.",
                 },
-                "service_type": {
+                "order_type": {
                     "type": "string",
-                    "description": "The type of service to book.",
-                    "enum": [
-                        "oil_change",
-                        "tire_rotation",
-                        "brake_inspection",
-                        "diagnostic",
-                        "other",
-                    ],
+                    "description": "How the customer wants to receive the order.",
+                    "enum": ["dine_in", "pickup", "delivery"],
                 },
-                "date": {
-                    "type": "string",
-                    "description": "The appointment date in YYYY-MM-DD format.",
+                "items": {
+                    "type": "array",
+                    "description": "List of ordered items with quantities.",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "name": {"type": "string"},
+                            "quantity": {"type": "integer"},
+                            "price": {"type": "number"},
+                        },
+                        "required": ["name", "quantity", "price"],
+                    },
                 },
-                "time": {
-                    "type": "string",
-                    "description": "The appointment time in HH:MM (24-hour) format.",
+                "total_amount": {
+                    "type": "number",
+                    "description": "Total order amount in CAD.",
                 },
-                "vehicle_info": {
+                "delivery_address": {
                     "type": "string",
-                    "description": "The vehicle's year, make, and model, e.g., '2021 Ford Bronco'.",
+                    "description": "Delivery address. Required only for delivery orders.",
+                },
+                "special_instructions": {
+                    "type": "string",
+                    "description": "Any special instructions from the customer (e.g. no onions, extra spicy).",
                 },
             },
-            "required": [
-                "full_name",
-                "phone_number",
-                "service_type",
-                "date",
-                "time",
-                "vehicle_info",
-            ],
-            "additionalProperties": False,
+            "required": ["customer_name", "phone_number", "order_type", "items", "total_amount"],
         },
     },
 )
 
 
-async def create_appointment(
-    full_name: str,
+async def place_order(
+    customer_name: str,
     phone_number: str,
-    service_type: str,
-    date: str,
-    time: str,
-    vehicle_info: str,
+    order_type: str,
+    items: list,
+    total_amount: float,
+    delivery_address: str = "",
+    special_instructions: str = "",
 ) -> dict:
-    """
-    Simulates booking the service appointment in the shop's system.
-    """
     print(
-        (
-            "Running Tool: create_appointment("
-            f"full_name='{full_name}', "
-            f"service_type='{service_type}', "
-            f"vehicle='{vehicle_info}' "
-            f"date='{date}', "
-            f"time='{time}')"
-        )
+        f"Running Tool: place_order("
+        f"customer='{customer_name}', "
+        f"type='{order_type}', "
+        f"total='${total_amount}', "
+        f"items={[i['name'] for i in items]})"
     )
 
-    if not all([full_name, phone_number, service_type, date, time, vehicle_info]):
-        return {"success": False, "error": "Missing required information for booking."}
+    # TODO: Save to Supabase database
+    # TODO: Send WhatsApp notification to restaurant owner
+
+    order_id = f"BB-{datetime.now().strftime('%H%M%S')}"
+
+    wait_time = "20-30 minutes" if order_type == "pickup" else "40-60 minutes" if order_type == "delivery" else "10-15 minutes"
 
     return {
         "success": True,
-        "full_name": full_name,
-        "service_type": service_type,
-        "vehicle_info": vehicle_info,
-        "date": date,
-        "time": time,
+        "order_id": order_id,
+        "customer_name": customer_name,
+        "order_type": order_type,
+        "items": items,
+        "total_amount": total_amount,
+        "wait_time": wait_time,
+        "message": f"Order {order_id} confirmed! {wait_time} wait.",
     }
 
 
+# ─── Register Tools ────────────────────────────────────────────────────────────
+
 def get_tools():
-    """Tool description and function pairs for the LLM."""
     return [
-        (
-            check_availability_tool_description,
-            check_availability,
-        ),
-        (
-            create_appointment_tool_description,
-            create_appointment,
-        ),
-        (
-            search_knowledge_base_tool_description,
-            search_knowledge_base,
-        ),
+        (get_menu_tool_description, get_menu),
+        (check_item_availability_tool_description, check_item_availability),
+        (place_order_tool_description, place_order),
     ]

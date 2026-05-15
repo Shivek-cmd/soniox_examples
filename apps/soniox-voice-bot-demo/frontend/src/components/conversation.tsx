@@ -56,7 +56,7 @@ export function Conversation() {
 
     const url = new URL(backendWebsocketUrl);
     url.searchParams.append("language", language);
-    url.searchParams.append("voice", "Alina");
+    url.searchParams.append("voice", "Maya");
 
     const ws = new WebSocket(url.toString());
     websocket.current = ws;

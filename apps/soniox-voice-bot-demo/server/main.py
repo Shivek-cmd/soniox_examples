@@ -34,10 +34,32 @@ WEBSOCKET_PORT = int(os.getenv("WEBSOCKET_PORT", "8765"))
 SONIOX_API_KEY = os.getenv("SONIOX_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 
-OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-5.4-mini")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL") or "gpt-4o-mini"
 
-SONIOX_API_KEY_TTS = os.getenv("SONIOX_API_KEY_TTS", "")
-SONIOX_API_HOST_TTS = os.getenv("SONIOX_API_HOST_TTS", "")
+SONIOX_STT_MODEL = os.getenv("SONIOX_STT_MODEL") or "stt-rt-v4"
+SONIOX_TTS_MODEL = os.getenv("SONIOX_TTS_MODEL") or "tts-rt-v1"
+
+LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE") or "0.85")
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS") or "120")
+
+STT_CONTEXT = {
+    "general": [
+        {"key": "domain", "value": "restaurant"},
+        {"key": "topic", "value": "food ordering"},
+    ],
+    "terms": [
+        "Bizbull Restaurant", "Butter Chicken", "Chicken Tikka Masala", "Saag Chicken",
+        "Lamb Curry", "Goat Curry", "Dal Makhani", "Palak Paneer", "Kadai Paneer",
+        "Chana Masala", "Aloo Gobi", "Mix Vegetable", "Samosa", "Veg Pakora",
+        "Aloo Tikki", "Tandoori Chicken", "Chicken Tikka", "Butter Naan", "Garlic Naan",
+        "Peshwari Naan", "Paratha", "Roti", "Basmati Rice", "Chicken Biryani",
+        "Veg Biryani", "Mango Lassi", "Sweet Lassi", "Salted Lassi", "Masala Chai",
+        "Gulab Jamun", "Kheer", "Rasmalai", "dine-in", "pickup", "delivery",
+    ],
+}
+
+SONIOX_API_KEY_TTS = os.getenv("SONIOX_API_KEY_TTS") or SONIOX_API_KEY
+SONIOX_API_HOST_TTS = os.getenv("SONIOX_API_HOST_TTS") or "wss://tts-rt.soniox.com/tts-websocket"
 
 
 class QueryParams(pydantic.BaseModel):
@@ -100,21 +122,25 @@ async def handle(websocket: ServerConnection):
         ),
         STTProcessor(
             api_key=SONIOX_API_KEY,
+            model=SONIOX_STT_MODEL,
             audio_format=params.audio_in_format,
             audio_sample_rate=params.audio_in_sample_rate,
             num_channels=params.audio_in_num_channels,
             language_hints=[params.language],
-            context="Soniox",
+            context=STT_CONTEXT,
         ),
         LLMProcessor(
             api_key=OPENAI_API_KEY,
             model=OPENAI_MODEL,
             system_message=get_system_message(LANGUAGES_MAP[params.language]),
             tools=get_tools(),
+            temperature=LLM_TEMPERATURE,
+            max_tokens=LLM_MAX_TOKENS,
         ),
         TTSProcessor(
             api_key=SONIOX_API_KEY_TTS,
             api_host=SONIOX_API_HOST_TTS,
+            model=SONIOX_TTS_MODEL,
             language=params.language,
             sample_rate=params.audio_out_sample_rate,
             voice=params.voice,

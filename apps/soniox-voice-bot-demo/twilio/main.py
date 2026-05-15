@@ -21,7 +21,7 @@ load_dotenv()
 PORT = int(os.getenv("PORT", 5050))
 SONIOX_VOICE_BOT_WS_URL = os.getenv("SONIOX_VOICE_BOT_WS_URL", "")
 VOICE_BOT_LANGUAGE = os.getenv("VOICE_BOT_LANGUAGE", "en")
-VOICE_BOT_VOICE = os.getenv("VOICE_BOT_VOICE", "female_1")
+VOICE_BOT_VOICE = os.getenv("VOICE_BOT_VOICE", "Maya")
 
 if not SONIOX_VOICE_BOT_WS_URL:
     raise ValueError(

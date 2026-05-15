@@ -64,6 +64,8 @@ class LLMProcessor(MessageProcessor):
         tools: List[
             Tuple[ChatCompletionToolUnionParam, Callable[..., Awaitable[Any]]]
         ] = [],
+        temperature: float = 0.85,
+        max_tokens: int = 120,
     ):
         """Initialize the LLM processor.
 
@@ -76,6 +78,8 @@ class LLMProcessor(MessageProcessor):
         """
         self._client = openai.AsyncOpenAI(api_key=api_key, base_url=base_url)
         self._model = model
+        self._temperature = temperature
+        self._max_tokens = max_tokens
 
         # Prepare tools for LLM
         self._tool_descriptions = []
@@ -201,6 +205,8 @@ class LLMProcessor(MessageProcessor):
                     stream=True,
                     tools=self._tool_descriptions,
                     tool_choice="auto",
+                    temperature=self._temperature,
+                    max_tokens=self._max_tokens,
                 )
                 tool_calls = []
 
